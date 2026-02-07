@@ -5,7 +5,8 @@ import {
   updateTransaction,
   deleteTransaction,
   getDashboardStats,
-  respondToTransaction
+  respondToTransaction,
+  getFriendTransactions
 } from '../controllers/transactionController';
 import { protect } from '../middlewares/authMiddleware';
 
@@ -16,6 +17,7 @@ router.use(protect); // All routes protected
 router.get('/', getTransactions);
 router.post('/', createTransaction);
 router.get('/dashboard', getDashboardStats);
+router.get('/friend/:friendId', getFriendTransactions);
 router.put('/:id', updateTransaction);
 router.post('/:id/respond', respondToTransaction);
 router.delete('/:id', deleteTransaction);
