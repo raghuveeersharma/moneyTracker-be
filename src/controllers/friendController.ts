@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Friendship, User } from '../models';
+import { Friendship, User, Message } from '../models';
 import mongoose from 'mongoose';
 import { AuthRequest } from '../middlewares/authMiddleware';
 
@@ -103,14 +103,22 @@ export const getFriends = async (req: AuthRequest, res: Response) => {
       status: 'accepted'
     }).populate('requester recipient', 'username email');
 
-    // Extract friend details
-    const friends = friendships.map(f => {
+    // Extract friend details and get unread counts
+    const friends = await Promise.all(friendships.map(async (f) => {
       const friend = f.requester._id.toString() === req.user.id ? f.recipient : f.requester;
+      
+      const unreadCount = await Message.countDocuments({
+        senderId: (friend as any)._id,
+        receiverId: userId,
+        read: false
+      });
+
       return {
         friendshipId: f._id,
         ...((friend as any).toObject()),
+        unreadCount
       };
-    });
+    }));
 
     res.json(friends);
   } catch (error) {

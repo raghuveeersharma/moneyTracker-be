@@ -62,3 +62,21 @@ export const saveMessage = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Server Error' });
   }
 };
+
+// Mark messages as read
+export const markMessagesAsRead = async (req: AuthRequest, res: Response) => {
+  try {
+    const friendId = req.params.friendId;
+    const userId = req.user.id;
+
+    await Message.updateMany(
+      { senderId: friendId, receiverId: userId, read: false },
+      { $set: { read: true } }
+    );
+
+    res.status(200).json({ message: 'Messages marked as read' });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};

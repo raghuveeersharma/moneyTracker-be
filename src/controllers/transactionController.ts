@@ -206,3 +206,115 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Server Error' });
   }
 };
+
+// Get transactions with a specific friend with pagination and stats
+export const getFriendTransactions = async (req: AuthRequest, res: Response) => {
+    try {
+        const userId = new mongoose.Types.ObjectId(req.user.id);
+        const friendId = new mongoose.Types.ObjectId(req.params.friendId as string);
+        
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20; // Default limit
+        const skip = (page - 1) * limit;
+
+        // Base query for transactions between these two users
+        const query = {
+            $or: [
+                { creatorId: userId, counterpartyId: friendId },
+                { creatorId: friendId, counterpartyId: userId }
+            ]
+        };
+
+        // 1. Get Paginated Transactions
+        const transactions = await Transaction.find(query)
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('creatorId', 'username')
+            .populate('counterpartyId', 'username');
+
+        const totalTransactions = await Transaction.countDocuments(query);
+
+        // 2. Calculate Net Balance (Aggregate over ALL transactions, not just paginated ones)
+        const allTransactions = await Transaction.find(query); // Optimization: Use aggregate for performance if many docs
+        
+        let totalGiven = 0; // I gave (Lend by me OR Borrow by them)
+        let totalReceived = 0; // I received (Borrow by me OR Lend by them)
+
+        allTransactions.forEach(t => {
+            if (t.approvalStatus !== 'accepted' && t.approvalStatus !== 'pending') return; // Should we include pending? usually yes for "what is owed" until rejected? Or only accepted?
+            // "ultimately they are still in debt OR they will get that money" -> implies accepted debt.
+            // Let's count ACCEPTED transactions for the balance to be accurate.
+            if (t.approvalStatus !== 'accepted') return;
+
+            // Normalize to "User's perspective"
+            const isMyTransaction = t.creatorId.toString() === req.user.id;
+            
+            if (isMyTransaction) {
+                if (t.type === 'lend') totalGiven += t.amount;
+                else totalReceived += t.amount;
+            } else {
+                // Friend created it
+                if (t.type === 'lend') totalReceived += t.amount; // They lent to me -> I received
+                else totalGiven += t.amount; // They borrowed from me -> I gave
+            }
+        });
+        
+        // Subtract paid amounts?
+        // The Schema has `paymentStatus: 'paid' | 'pending'`.
+        // If it's PAID, it shouldn't count towards the ACTIVE debt balance?
+        // OR "History" means total ever?
+        // "how much we give and borrow and it will tell the user that the ultimately they are still in debt"
+        // This implies CURRENT net debt.
+        // So we should exclude 'paid' transactions from the balance calculation, OR subtract them.
+        // Or simplified: Net Balance = (Outstanding Given) - (Outstanding Received).
+        
+        // Refined Logic for Balance:
+        let netBalance = 0;
+        
+        allTransactions.forEach(t => {
+            if (t.approvalStatus !== 'accepted') return;
+            if (t.paymentStatus === 'paid') return; // Ignore paid off debts for the "Current Debt" number
+
+            const isMeCreator = t.creatorId.toString() === req.user.id;
+            
+            // Effect on Me
+            // Lend (Me->Friend): + (Friend owes me)
+            // Borrow (Me->Friend): - (I owe friend)
+            
+            let amount = t.amount;
+            
+            if (isMeCreator) {
+                if (t.type === 'lend') netBalance += amount;
+                else netBalance -= amount;
+            } else {
+                // Friend created
+                 if (t.type === 'lend') netBalance -= amount; // Friend lent to me (I owe)
+                 else netBalance += amount; // Friend borrowed from me (They owe)
+            }
+        });
+        
+        // Determine text status
+        // netBalance > 0: Friend owes me
+        // netBalance < 0: I owe Friend
+        
+        res.json({
+            transactions,
+            stats: {
+                netBalance,
+                totalGiven, // Maybe keeping these as raw totals is useful too? User asked "total of how much we give and borrow"
+                totalReceived // This might mean "Total Volume" or "Current Outstanding". I'll provide Net Balance as the primary metric.
+            },
+            pagination: {
+                page,
+                limit,
+                total: totalTransactions,
+                pages: Math.ceil(totalTransactions / limit)
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching friend transactions:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
