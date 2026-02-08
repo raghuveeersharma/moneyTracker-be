@@ -13,7 +13,7 @@ const server = http.createServer(app);
 // Socket.io Setup
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: process.env.CORS_URL,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -33,6 +33,16 @@ io.on('connection', (socket) => {
   socket.on('send_message', (data) => {
     // data: { to: userId, message: text, from: userId }
     io.to(data.to).emit('receive_message', data);
+  });
+
+  socket.on('typing', (data) => {
+    // data: { recipientId: string, senderId: string }
+    io.to(data.recipientId).emit('typing', { senderId: data.senderId });
+  });
+
+  socket.on('stop_typing', (data) => {
+    // data: { recipientId: string, senderId: string }
+    io.to(data.recipientId).emit('stop_typing', { senderId: data.senderId });
   });
 
   socket.on('disconnect', () => {
