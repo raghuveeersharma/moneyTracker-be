@@ -37,6 +37,21 @@ export interface IMessage extends Document {
   read: boolean;
 }
 
+export interface IFinanceNote extends Document {
+  userId: mongoose.Types.ObjectId;
+  description: string;
+  amount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IFinanceBalance extends Document {
+  userId: mongoose.Types.ObjectId;
+  balance: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface IFriendship extends Document {
   requester: mongoose.Types.ObjectId;
   recipient: mongoose.Types.ObjectId;
@@ -90,6 +105,17 @@ const FriendshipSchema = new Schema<IFriendship>({
 // Compound index to prevent duplicate friendships
 FriendshipSchema.index({ requester: 1, recipient: 1 }, { unique: true });
 
+const FinanceNoteSchema = new Schema<IFinanceNote>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  description: { type: String, required: true },
+  amount: { type: Number, required: true },
+}, { timestamps: true });
+
+const FinanceBalanceSchema = new Schema<IFinanceBalance>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  balance: { type: Number, required: true, default: 0 },
+}, { timestamps: true });
+
 // --- Models ---
 
 export const User = mongoose.model<IUser>('User', UserSchema);
@@ -97,3 +123,5 @@ export const Contact = mongoose.model<IContact>('Contact', ContactSchema);
 export const Transaction = mongoose.model<ITransaction>('Transaction', TransactionSchema);
 export const Message = mongoose.model<IMessage>('Message', MessageSchema);
 export const Friendship = mongoose.model<IFriendship>('Friendship', FriendshipSchema);
+export const FinanceNote = mongoose.model<IFinanceNote>('FinanceNote', FinanceNoteSchema);
+export const FinanceBalance = mongoose.model<IFinanceBalance>('FinanceBalance', FinanceBalanceSchema);

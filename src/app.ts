@@ -10,6 +10,7 @@ import transactionRoutes from './routes/transactionRoutes';
 import contactRoutes from './routes/contactRoutes';
 import friendRoutes from './routes/friendRoutes';
 import messageRoutes from './routes/messageRoutes';
+import financeNoteRoutes from './routes/financeNoteRoutes';
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/friends', friendRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/finance-notes', financeNoteRoutes);
 
 
 // Error Handling Middleware
